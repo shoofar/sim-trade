@@ -36,11 +36,12 @@ def load_data_table(csv_path: Path, timeframe: str) -> InMemoryDataTable:
         require_fields(reader.fieldnames or [])
 
         for row in reader:
-            if len(records) == MAX_RECORDS:
-                raise CsvLoadError("Selected CSV exceeds the 20000 record limit")
+            ensure_record_limit_allows(len(records))
             records.append(model_record_from_csv_row(row, timeframe))
 
-    table = InMemoryDataTable()
-    for record in records:
-        table.store(record)
-    return table
+    return InMemoryDataTable(records)
+
+
+def ensure_record_limit_allows(current_count: int) -> None:
+    if current_count == MAX_RECORDS:
+        raise CsvLoadError("Selected CSV exceeds the 20000 record limit")

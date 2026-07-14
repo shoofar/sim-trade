@@ -4,6 +4,7 @@ from sim_server.csv_confirmation_records import MODEL_FIELDS, REQUIRED_FIELDS, C
 from sim_server.memory_table import (
     MAX_RECORDS,
     InMemoryDataTable,
+    ensure_record_limit_allows,
     load_data_table,
 )
 
@@ -29,8 +30,12 @@ def valid_rows(count: int) -> list[list[str]]:
     ]
 
 
+def csv_path_for(root: Path) -> Path:
+    return root / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+
+
 def test_loads_all_required_model_records_into_memory(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(4))
 
     table = load_data_table(csv_path, "tick")
@@ -42,7 +47,7 @@ def test_loads_all_required_model_records_into_memory(tmp_path):
 
 
 def test_confirmation_sample_displays_at_most_three_records(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(4))
 
     table = load_data_table(csv_path, "tick")
@@ -51,14 +56,14 @@ def test_confirmation_sample_displays_at_most_three_records(tmp_path):
 
 
 def test_accepts_exactly_maximum_record_count(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(MAX_RECORDS))
 
     assert load_data_table(csv_path, "tick").count == MAX_RECORDS
 
 
 def test_rejects_above_maximum_without_partial_table(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(MAX_RECORDS + 1))
 
     try:
@@ -70,7 +75,7 @@ def test_rejects_above_maximum_without_partial_table(tmp_path):
 
 
 def test_empty_csv_stores_zero_records(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, [])
 
     table = load_data_table(csv_path, "tick")
@@ -86,3 +91,7 @@ def test_data_table_is_in_memory_only(tmp_path):
     assert table.count == 1
     assert not (tmp_path / "data_table.json").exists()
     assert not (tmp_path / "data_table.csv").exists()
+
+
+def test_record_limit_allows_count_below_maximum():
+    assert ensure_record_limit_allows(MAX_RECORDS - 1) is None

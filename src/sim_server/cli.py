@@ -8,7 +8,7 @@ from sim_server.csv_load_confirmation import find_csv_for_selection
 from sim_server.instrument_description_config import load_initial_descriptions
 from sim_server.instrument_descriptions import description_for
 from sim_server.instruments import instrument_names
-from sim_server.memory_table import load_data_table
+from sim_server.memory_table_csv_loader import load_data_table
 from sim_server.selection_memory import SelectionTable, select_date, select_instrument
 from sim_server.timeframe_dates import discover_dates, discover_timeframes
 

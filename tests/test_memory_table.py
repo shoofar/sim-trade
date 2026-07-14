@@ -4,7 +4,10 @@ from sim_server.csv_confirmation_records import MODEL_FIELDS, REQUIRED_FIELDS, C
 from sim_server.memory_table import (
     MAX_RECORDS,
     InMemoryDataTable,
+    data_table_from_records,
     ensure_record_limit_allows,
+)
+from sim_server.memory_table_csv_loader import (
     load_data_table,
 )
 
@@ -95,3 +98,11 @@ def test_data_table_is_in_memory_only(tmp_path):
 
 def test_record_limit_allows_count_below_maximum():
     assert ensure_record_limit_allows(MAX_RECORDS - 1) is None
+
+
+def test_constructs_data_table_from_records_without_csv_io():
+    records = [{"ts_event": "2026-05-01T00:00:00Z"}]
+
+    table = data_table_from_records(records)
+
+    assert table.rows == records

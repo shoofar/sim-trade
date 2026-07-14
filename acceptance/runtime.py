@@ -25,6 +25,16 @@ IGNORES_FILENAMES_WITHOUT_DATES = (
 REPORTS_EMPTY_SELECTED_INSTRUMENT_TIMEFRAMES = (
     "Console timeframe date discovery 004 reports no timeframes for an empty instrument directory"
 )
+STORES_VALID_SELECTION = "Console selection memory 001 stores a valid instrument and date selection"
+REJECTS_UNDISCOVERED_DATE = (
+    "Console selection memory 002 rejects a date that was not discovered for the selected instrument"
+)
+REJECTS_UNDISCOVERED_INSTRUMENT = (
+    "Console selection memory 003 rejects an instrument that was not discovered"
+)
+KEEPS_SELECTION_IN_SESSION = (
+    "Console selection memory 004 keeps selections only for the current run"
+)
 
 
 def run_scenario(name: str) -> None:
@@ -116,6 +126,58 @@ def run_scenario(name: str) -> None:
             output,
             contains=["No timeframes available for MESM6"],
             excludes=["Traceback"],
+        )
+        return
+
+    if name == STORES_VALID_SELECTION:
+        output = _run_console_with_selection(
+            selected="MESM6\n2026-05-01",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["Stored selection MESM6 2026-05-01"],
+            excludes=["csv row content"],
+        )
+        return
+
+    if name == REJECTS_UNDISCOVERED_DATE:
+        output = _run_console_with_selection(
+            selected="MESM6\n2026-05-02",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["Date 2026-05-02 is not available for MESM6"],
+            excludes=["Stored selection MESM6 2026-05-02", "Traceback"],
+        )
+        return
+
+    if name == REJECTS_UNDISCOVERED_INSTRUMENT:
+        output = _run_console_with_selection(
+            selected="NQMM6",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["Instrument NQMM6 is not available"],
+            excludes=["Stored selection NQMM6", "Traceback"],
+        )
+        return
+
+    if name == KEEPS_SELECTION_IN_SESSION:
+        output = _run_console_with_selection(
+            selected="MESM6\n2026-05-01",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["Stored selection MESM6 2026-05-01"],
+            excludes=["selection.json", "selections.csv"],
         )
         return
 

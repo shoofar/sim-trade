@@ -1,3 +1,8 @@
+# mutation-stamp: sha256=4ab22ac0ebecfde1201b0ae12bf0052030213a5c382d8c46f84b37d59e5100f8
+# acceptance-mutation-manifest-begin
+# {"version":1,"tested_at":"2026-07-14T20:11:22Z","feature_name":"Console selection memory","feature_path":"acceptance\\features\\console_selection_memory.feature","background_hash":"55f96f3d3681ed79ea71c6880db65603f2927be9cf63719bed809fba09aa269d","implementation_hash":"unknown","scenarios":[]}
+# acceptance-mutation-manifest-end
+
 # Console selection memory 001
 Feature: Console selection memory
   The console application remembers the user's selected instrument and date during the current run.

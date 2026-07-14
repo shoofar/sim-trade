@@ -62,6 +62,21 @@ HIDES_NON_REQUIRED_COLUMNS = (
 SHOWS_OHLC_SOURCE = (
     "Console CSV load confirmation 005 shows OHLC source for a selected OHLC data category"
 )
+STORES_LOADED_CSV_IN_MEMORY = (
+    "Console in-memory data table 001 stores required fields for a loaded CSV"
+)
+SUPPORTS_MAXIMUM_RECORD_COUNT = (
+    "Console in-memory data table 002 supports the agreed maximum record count"
+)
+REJECTS_ABOVE_MAXIMUM_RECORD_COUNT = (
+    "Console in-memory data table 003 rejects files above the agreed maximum record count"
+)
+REPORTS_EMPTY_CSV_TABLE = (
+    "Console in-memory data table 004 reports an empty CSV without sample records"
+)
+KEEPS_DATA_TABLE_IN_SESSION = (
+    "Console in-memory data table 005 is available only during the current run"
+)
 
 
 def run_scenario(name: str) -> None:
@@ -328,6 +343,78 @@ def run_scenario(name: str) -> None:
             output,
             contains=["timeframe=1s", "source=OHLC"],
             excludes=[],
+        )
+        return
+
+    if name == STORES_LOADED_CSV_IN_MEMORY:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(4),
+        )
+        _assert_console_output(
+            output,
+            contains=["4 records stored in memory", "ts_event=", "timeframe=tick", "source=RAW-TICK"],
+            excludes=[],
+        )
+        assert output.count("ts_event=") == 3, output
+        return
+
+    if name == SUPPORTS_MAXIMUM_RECORD_COUNT:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(20000),
+        )
+        _assert_console_output(
+            output,
+            contains=["20000 records stored in memory"],
+            excludes=["Traceback"],
+        )
+        assert output.count("ts_event=") == 3, output
+        return
+
+    if name == REJECTS_ABOVE_MAXIMUM_RECORD_COUNT:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(20001),
+        )
+        _assert_console_output(
+            output,
+            contains=["Selected CSV exceeds the 20000 record limit"],
+            excludes=["records stored in memory", "ts_event=", "Traceback"],
+        )
+        return
+
+    if name == REPORTS_EMPTY_CSV_TABLE:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=[],
+        )
+        _assert_console_output(
+            output,
+            contains=["0 records stored in memory"],
+            excludes=["ts_event=", "Traceback"],
+        )
+        return
+
+    if name == KEEPS_DATA_TABLE_IN_SESSION:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(4),
+        )
+        _assert_console_output(
+            output,
+            contains=["4 records stored in memory"],
+            excludes=["data_table.json", "data_table.csv"],
         )
         return
 

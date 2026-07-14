@@ -4,13 +4,11 @@ from pathlib import Path
 from typing import Sequence
 
 from sim_server.csv_confirmation_records import CsvLoadError, format_record
-from sim_server.csv_load_confirmation import (
-    find_csv_for_selection,
-    load_confirmation_records,
-)
+from sim_server.csv_load_confirmation import find_csv_for_selection
 from sim_server.instrument_description_config import load_initial_descriptions
 from sim_server.instrument_descriptions import description_for
 from sim_server.instruments import instrument_names
+from sim_server.memory_table_csv_loader import load_data_table
 from sim_server.selection_memory import SelectionTable, select_date, select_instrument
 from sim_server.timeframe_dates import discover_dates, discover_timeframes
 
@@ -110,13 +108,14 @@ def show_selected_instrument_details(
         return 0
 
     try:
-        records = load_confirmation_records(csv_path, selected_timeframe)
+        data_table = load_data_table(csv_path, selected_timeframe)
     except CsvLoadError as error:
         print(str(error))
         return 0
 
     print("CSV loaded")
-    for record in records:
+    print(f"{data_table.count} records stored in memory")
+    for record in data_table.sample_records():
         print(format_record(record))
 
     return 0

@@ -18,10 +18,12 @@ if not exist "%CODE_ROOT%\acceptance\generated" mkdir "%CODE_ROOT%\acceptance\ge
 "%PARSER%" "%CODE_ROOT%\acceptance\features\console_selection_memory.feature" "%CODE_ROOT%\build\acceptance\ir\console_selection_memory.json" || exit /b 1
 "%PARSER%" "%CODE_ROOT%\acceptance\features\console_instrument_description.feature" "%CODE_ROOT%\build\acceptance\ir\console_instrument_description.json" || exit /b 1
 "%PARSER%" "%CODE_ROOT%\acceptance\features\console_csv_load_confirmation.feature" "%CODE_ROOT%\build\acceptance\ir\console_csv_load_confirmation.json" || exit /b 1
+"%PARSER%" "%CODE_ROOT%\acceptance\features\console_in_memory_data_table.feature" "%CODE_ROOT%\build\acceptance\ir\console_in_memory_data_table.json" || exit /b 1
 pushd "%CODE_ROOT%" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_instrument_discovery.json" "%CODE_ROOT%\acceptance\generated\test_console_instrument_discovery.py" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_timeframe_date_discovery.json" "%CODE_ROOT%\acceptance\generated\test_console_timeframe_date_discovery.py" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_selection_memory.json" "%CODE_ROOT%\acceptance\generated\test_console_selection_memory.py" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_instrument_description.json" "%CODE_ROOT%\acceptance\generated\test_console_instrument_description.py" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_csv_load_confirmation.json" "%CODE_ROOT%\acceptance\generated\test_console_csv_load_confirmation.py" || exit /b 1
+python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_in_memory_data_table.json" "%CODE_ROOT%\acceptance\generated\test_console_in_memory_data_table.py" || exit /b 1
 python -m pytest "%CODE_ROOT%\acceptance\generated" || exit /b 1

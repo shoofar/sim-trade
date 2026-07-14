@@ -14,6 +14,8 @@ if not exist "%PARSER%" (
 if not exist "%CODE_ROOT%\build\acceptance\ir" mkdir "%CODE_ROOT%\build\acceptance\ir"
 if not exist "%CODE_ROOT%\acceptance\generated" mkdir "%CODE_ROOT%\acceptance\generated"
 "%PARSER%" "%CODE_ROOT%\acceptance\features\console_instrument_discovery.feature" "%CODE_ROOT%\build\acceptance\ir\console_instrument_discovery.json" || exit /b 1
+"%PARSER%" "%CODE_ROOT%\acceptance\features\console_timeframe_date_discovery.feature" "%CODE_ROOT%\build\acceptance\ir\console_timeframe_date_discovery.json" || exit /b 1
 pushd "%CODE_ROOT%" || exit /b 1
 python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_instrument_discovery.json" "%CODE_ROOT%\acceptance\generated\test_console_instrument_discovery.py" || exit /b 1
+python -m acceptance.generate_acceptance "%CODE_ROOT%\build\acceptance\ir\console_timeframe_date_discovery.json" "%CODE_ROOT%\acceptance\generated\test_console_timeframe_date_discovery.py" || exit /b 1
 python -m pytest "%CODE_ROOT%\acceptance\generated" || exit /b 1

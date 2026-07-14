@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Sequence
 
 from sim_server.instruments import instrument_names
+from sim_server.timeframe_dates import discover_dates, discover_timeframes
 
 
 def discover_instruments(data_dir: Path) -> list[str]:
@@ -24,6 +25,26 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     for instrument in instruments:
         print(instrument)
+
+    try:
+        selected = input().strip()
+    except (EOFError, OSError):
+        return 0
+
+    if not selected:
+        return 0
+
+    instrument_dir = data_dir / selected
+    timeframes = discover_timeframes(instrument_dir)
+    if not timeframes:
+        print(f"No timeframes available for {selected}")
+        return 0
+
+    for timeframe in timeframes:
+        print(timeframe)
+
+    for date in discover_dates(instrument_dir):
+        print(date)
 
     return 0
 

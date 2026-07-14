@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.pyo
+*.egg-info/
+build/
+dist/
+projects/*/.swarmforge/hardening/
+.swarmforge/hardening/
+.swarmforge/gui_tasks.json
+.swarmforge/gui_outbox/

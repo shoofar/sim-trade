@@ -8,6 +8,11 @@ def write_instrument_file(data_dir, instrument, relative_path, content="rows are
     path.write_text(content, encoding="utf-8")
 
 
+def provide_console_inputs(monkeypatch, *values):
+    selections = iter(values)
+    monkeypatch.setattr("builtins.input", lambda: next(selections))
+
+
 def test_stores_valid_selection_row_in_memory():
     table = SelectionTable()
 
@@ -20,7 +25,7 @@ def test_stores_valid_selection_row_in_memory():
 def test_rejects_undiscovered_instrument_without_storing_selection():
     table = SelectionTable()
 
-    result = select_instrument("NQMM6", ["MESM6"], table)
+    result = select_instrument("NQMM6", ["MESM6"])
 
     assert not result.accepted
     assert result.message == "Instrument NQMM6 is not available"
@@ -60,8 +65,7 @@ def test_main_confirms_valid_selection_without_printing_csv_content(tmp_path, mo
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv", "csv row content")
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", "2026-05-01"])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-01")
 
     assert main([]) == 0
 
@@ -74,8 +78,7 @@ def test_main_rejects_invalid_date_without_traceback(tmp_path, monkeypatch, caps
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv")
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", "2026-05-02"])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-02")
 
     assert main([]) == 0
 
@@ -83,6 +86,33 @@ def test_main_rejects_invalid_date_without_traceback(tmp_path, monkeypatch, caps
     assert "Date 2026-05-02 is not available for MESM6" in output
     assert "Stored selection MESM6 2026-05-02" not in output
     assert "Traceback" not in output
+
+
+def test_main_stops_when_date_input_is_unavailable(tmp_path, monkeypatch, capsys):
+    data_dir = tmp_path / "DANE"
+    write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv")
+    monkeypatch.chdir(tmp_path)
+    provide_console_inputs(monkeypatch, "MESM6")
+
+    assert main([]) == 0
+
+    output = capsys.readouterr().out
+    assert "2026-05-01" in output
+    assert "Stored selection" not in output
+    assert "Traceback" not in output
+
+
+def test_main_stops_after_blank_date_selection(tmp_path, monkeypatch, capsys):
+    data_dir = tmp_path / "DANE"
+    write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv")
+    monkeypatch.chdir(tmp_path)
+    provide_console_inputs(monkeypatch, "MESM6", " ")
+
+    assert main([]) == 0
+
+    output = capsys.readouterr().out
+    assert "2026-05-01" in output
+    assert "Stored selection" not in output
 
 
 def test_main_rejects_invalid_instrument_without_traceback(tmp_path, monkeypatch, capsys):

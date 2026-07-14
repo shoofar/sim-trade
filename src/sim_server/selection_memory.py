@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 
+SelectionRow = dict[str, str]
+
+
 @dataclass(frozen=True)
 class SelectionResult:
     accepted: bool
@@ -11,9 +14,9 @@ class SelectionResult:
 
 @dataclass
 class SelectionTable:
-    rows: list[dict[str, str]] = field(default_factory=list)
+    rows: list[SelectionRow] = field(default_factory=list)
 
-    def store(self, instrument: str, date: str) -> dict[str, str]:
+    def store(self, instrument: str, date: str) -> SelectionRow:
         row = {"instrument": instrument, "date": date}
         self.rows.append(row)
         return row
@@ -22,9 +25,7 @@ class SelectionTable:
 def select_instrument(
     selected_instrument: str,
     available_instruments: list[str],
-    selection_table: SelectionTable,
 ) -> SelectionResult:
-    del selection_table
     if selected_instrument not in available_instruments:
         return SelectionResult(False, f"Instrument {selected_instrument} is not available")
 

@@ -36,7 +36,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     selection_table = SelectionTable()
-    instrument_result = select_instrument(selected_instrument, instruments, selection_table)
+    instrument_result = select_instrument(selected_instrument, instruments)
     if not instrument_result.accepted:
         print(instrument_result.message)
         return 0

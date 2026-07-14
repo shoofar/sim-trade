@@ -12,6 +12,9 @@
 - After writing the handoff file, notify the target role using the same style of role-to-role delivery used in the earlier SwarmForge, such as `send_to_role`.
 - The notification only states that a new message exists.
 - The notification does not require master approval.
+- Do not create duplicate inbox messages for the same handoff.
+- When using `send_to_role ... /file`, prefer a source file outside the target role inbox, such as `agent_context/messages/`; the send script copies that file into the target inbox.
+- If a handoff file is already in the target role inbox, `send_to_role ... /file` must only notify the target role about that existing file and must not copy it again under a new timestamp.
 
 ## Processing rule
 

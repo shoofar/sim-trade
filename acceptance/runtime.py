@@ -10,33 +10,43 @@ from tempfile import TemporaryDirectory
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 
+LISTS_DIRECT_INSTRUMENTS = "Console instrument discovery 001 lists direct instrument directories"
+IGNORES_NON_DIRECTORY_ENTRIES = "Console instrument discovery 002 ignores non-directory entries"
+REPORTS_MISSING_DATA_DIRECTORY = "Console instrument discovery 003 reports missing data directory"
+
 
 def run_scenario(name: str) -> None:
-    if name == "Console instrument discovery 001 lists direct instrument directories":
+    if name == LISTS_DIRECT_INSTRUMENTS:
         output = _run_console_with(
             directories=["MESM6", "NQMM6"],
             files=[],
         )
-        _assert_contains(output, "MESM6")
-        _assert_contains(output, "NQMM6")
-        _assert_not_contains(output, "tick")
-        _assert_not_contains(output, "glbx-mdp3")
+        _assert_console_output(
+            output,
+            contains=["MESM6", "NQMM6"],
+            excludes=["tick", "glbx-mdp3"],
+        )
         return
 
-    if name == "Console instrument discovery 002 ignores non-directory entries":
+    if name == IGNORES_NON_DIRECTORY_ENTRIES:
         output = _run_console_with(
             directories=["MESM6"],
             files=["README.txt"],
         )
-        _assert_contains(output, "MESM6")
-        _assert_not_contains(output, "README.txt")
+        _assert_console_output(
+            output,
+            contains=["MESM6"],
+            excludes=["README.txt"],
+        )
         return
 
-    if name == "Console instrument discovery 003 reports missing data directory":
+    if name == REPORTS_MISSING_DATA_DIRECTORY:
         output = _run_console_without_dane()
-        _assert_contains(output, "No data directory")
-        _assert_contains(output, "DANE")
-        _assert_not_contains(output, "Traceback")
+        _assert_console_output(
+            output,
+            contains=["No data directory", "DANE"],
+            excludes=["Traceback"],
+        )
         return
 
     raise AssertionError(f"Unhandled acceptance scenario: {name}")
@@ -72,6 +82,13 @@ def _run_console(cwd: Path) -> str:
     combined = completed.stdout + completed.stderr
     assert completed.returncode == 0, combined
     return combined
+
+
+def _assert_console_output(output: str, contains: list[str], excludes: list[str]) -> None:
+    for expected in contains:
+        _assert_contains(output, expected)
+    for unexpected in excludes:
+        _assert_not_contains(output, unexpected)
 
 
 def _assert_contains(output: str, expected: str) -> None:

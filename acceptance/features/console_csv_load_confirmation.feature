@@ -1,3 +1,8 @@
+# mutation-stamp: sha256=40389c05b55df3f0eafed83f6c9fb9fd541adcdbfd47fba6f62b5670440ef9ab
+# acceptance-mutation-manifest-begin
+# {"version":1,"tested_at":"2026-07-14T21:04:11Z","feature_name":"Console CSV load confirmation","feature_path":"acceptance\\features\\console_csv_load_confirmation.feature","background_hash":"5ecf4db6a59f0d7b8e2496c753d3f1a80b97f5cadbf679213080ecb1088c65e3","implementation_hash":"unknown","scenarios":[]}
+# acceptance-mutation-manifest-end
+
 # Console CSV load confirmation 001
 Feature: Console CSV load confirmation
   The console application confirms loading a selected CSV by showing up to three required-field records.

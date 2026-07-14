@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
+from sim_server.instrument_descriptions import description_for, load_initial_descriptions
 from sim_server.instruments import instrument_names
 from sim_server.selection_memory import SelectionTable, select_date, select_instrument
 from sim_server.timeframe_dates import discover_dates, discover_timeframes
@@ -50,6 +51,11 @@ def show_selected_instrument_details(
     selection_table: SelectionTable,
 ) -> int:
     instrument_dir = data_dir / instrument
+    description = description_for(instrument, load_initial_descriptions(data_dir.parent))
+    print(description.instrument)
+    print(description.kind)
+    print(description.description)
+
     timeframes = discover_timeframes(instrument_dir)
     if not timeframes:
         print(f"No timeframes available for {instrument}")

@@ -7,6 +7,9 @@ __pycache__/
 build/
 dist/
 /.worktrees/
+/.swarmforge/
+/agent_context/
+/logs/
 projects/*/.swarmforge/hardening/
 .swarmforge/hardening/
 .swarmforge/gui_tasks.json

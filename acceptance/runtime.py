@@ -47,6 +47,21 @@ SHOWS_DEFAULT_FIELDS_FOR_MISSING_DETAILS = (
 DOES_NOT_ALLOW_DESCRIPTION_EDITING = (
     "Console instrument description 004 does not allow editing descriptions in this slice"
 )
+SHOWS_THREE_RAW_TICK_RECORDS = (
+    "Console CSV load confirmation 001 shows up to three RAW-TICK records with required fields"
+)
+SHOWS_SHORT_CSV_RECORD_COUNT = (
+    "Console CSV load confirmation 002 shows all records when fewer than three are loaded"
+)
+REJECTS_MISSING_REQUIRED_COLUMN = (
+    "Console CSV load confirmation 003 rejects a CSV missing a required column"
+)
+HIDES_NON_REQUIRED_COLUMNS = (
+    "Console CSV load confirmation 004 does not expose non-required CSV columns as model fields"
+)
+SHOWS_OHLC_SOURCE = (
+    "Console CSV load confirmation 005 shows OHLC source for a selected OHLC data category"
+)
 
 
 def run_scenario(name: str) -> None:
@@ -246,7 +261,88 @@ def run_scenario(name: str) -> None:
         )
         return
 
+    if name == SHOWS_THREE_RAW_TICK_RECORDS:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(4),
+        )
+        _assert_console_output(
+            output,
+            contains=["CSV loaded", "timeframe=tick", "source=RAW-TICK", "sequence=374608942"],
+            excludes=[],
+        )
+        assert output.count("ts_event=") == 3, output
+        return
+
+    if name == SHOWS_SHORT_CSV_RECORD_COUNT:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(2),
+        )
+        _assert_console_output(output, contains=["CSV loaded"], excludes=[])
+        assert output.count("ts_event=") == 2, output
+        return
+
+    if name == REJECTS_MISSING_REQUIRED_COLUMN:
+        header = [field for field in REQUIRED_CSV_FIELDS if field != "sequence"]
+        rows = [[value for index, value in enumerate(row) if REQUIRED_CSV_FIELDS[index] != "sequence"] for row in _csv_rows(1)]
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=header,
+            rows=rows,
+        )
+        _assert_console_output(
+            output,
+            contains=["Missing required column sequence"],
+            excludes=["ts_event=", "Traceback"],
+        )
+        return
+
+    if name == HIDES_NON_REQUIRED_COLUMNS:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\ntick\nload",
+            timeframe="tick",
+            header=[*REQUIRED_CSV_FIELDS, "publisher_id", "flags", "ts_recv"],
+            rows=[[*_csv_rows(1)[0], "1", "130", "2026-05-01T00:00:00Z"]],
+        )
+        _assert_console_output(
+            output,
+            contains=["CSV loaded", "ts_event=", "source=RAW-TICK"],
+            excludes=["publisher_id", "flags", "ts_recv"],
+        )
+        return
+
+    if name == SHOWS_OHLC_SOURCE:
+        output = _run_console_with_csv(
+            selected="MESM6\n2026-05-01\n1s\nload",
+            timeframe="1s",
+            header=REQUIRED_CSV_FIELDS,
+            rows=_csv_rows(1),
+        )
+        _assert_console_output(
+            output,
+            contains=["timeframe=1s", "source=OHLC"],
+            excludes=[],
+        )
+        return
+
     raise AssertionError(f"Unhandled acceptance scenario: {name}")
+
+
+REQUIRED_CSV_FIELDS = [
+    "ts_event",
+    "instrument_id",
+    "side",
+    "price",
+    "size",
+    "sequence",
+    "symbol",
+]
 
 
 def _run_console_with(directories: list[str], files: list[str]) -> str:
@@ -295,6 +391,36 @@ def _run_console_with_description_config(
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("csv row content", encoding="utf-8")
         return _run_console(root, stdin=f"{selected}\n")
+
+
+def _run_console_with_csv(
+    selected: str,
+    timeframe: str,
+    header: list[str],
+    rows: list[list[str]],
+) -> str:
+    with TemporaryDirectory() as temp:
+        root = Path(temp)
+        csv_path = root / "DANE" / "MESM6" / timeframe / "glbx-mdp3-20260501.trades.csv"
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [",".join(header), *(",".join(row) for row in rows)]
+        csv_path.write_text("\n".join(lines), encoding="utf-8")
+        return _run_console(root, stdin=f"{selected}\n")
+
+
+def _csv_rows(count: int) -> list[list[str]]:
+    return [
+        [
+            f"2026-05-01T00:00:00.00000000{index}Z",
+            "42005163",
+            "B",
+            f"7253.{index:09d}",
+            str(index + 1),
+            str(374608942 + index),
+            "MESM6",
+        ]
+        for index in range(count)
+    ]
 
 
 def _run_console(cwd: Path, stdin: str = "") -> str:

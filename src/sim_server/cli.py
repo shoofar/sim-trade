@@ -3,6 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
+from sim_server.csv_load_confirmation import (
+    CsvLoadError,
+    find_csv_for_selection,
+    format_record,
+    load_confirmation_records,
+)
 from sim_server.instrument_description_config import load_initial_descriptions
 from sim_server.instrument_descriptions import description_for
 from sim_server.instruments import instrument_names
@@ -79,6 +85,40 @@ def show_selected_instrument_details(
     if date_result.selection is not None:
         selection_table.store(date_result.selection["instrument"], date_result.selection["date"])
     print(date_result.message)
+
+    if not date_result.accepted:
+        return 0
+
+    try:
+        selected_timeframe = input().strip()
+    except (EOFError, OSError, StopIteration):
+        return 0
+
+    if not selected_timeframe:
+        return 0
+
+    try:
+        load_command = input().strip()
+    except (EOFError, OSError, StopIteration):
+        return 0
+
+    if load_command != "load":
+        return 0
+
+    csv_path = find_csv_for_selection(instrument_dir, selected_timeframe, selected_date)
+    if csv_path is None:
+        print(f"No CSV file available for {instrument} {selected_date} {selected_timeframe}")
+        return 0
+
+    try:
+        records = load_confirmation_records(csv_path, selected_timeframe)
+    except CsvLoadError as error:
+        print(str(error))
+        return 0
+
+    print("CSV loaded")
+    for record in records:
+        print(format_record(record))
 
     return 0
 

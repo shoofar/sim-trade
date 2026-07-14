@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
+from sim_server.csv_confirmation_records import CsvLoadError, format_record
 from sim_server.csv_load_confirmation import (
-    CsvLoadError,
     find_csv_for_selection,
-    format_record,
     load_confirmation_records,
 )
 from sim_server.instrument_description_config import load_initial_descriptions

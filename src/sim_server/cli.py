@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Sequence
 
 from sim_server.instruments import instrument_names
+from sim_server.selection_memory import SelectionTable, select_date, select_instrument
 from sim_server.timeframe_dates import discover_dates, discover_timeframes
 
 
@@ -22,7 +23,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print("No data directory available: DANE")
         return 0
 
-    for instrument in discover_instruments(data_dir):
+    instruments = discover_instruments(data_dir)
+    for instrument in instruments:
         print(instrument)
 
     try:
@@ -33,10 +35,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not selected_instrument:
         return 0
 
-    return show_selected_instrument_details(data_dir, selected_instrument)
+    selection_table = SelectionTable()
+    instrument_result = select_instrument(selected_instrument, instruments)
+    if not instrument_result.accepted:
+        print(instrument_result.message)
+        return 0
+
+    return show_selected_instrument_details(data_dir, selected_instrument, selection_table)
 
 
-def show_selected_instrument_details(data_dir: Path, instrument: str) -> int:
+def show_selected_instrument_details(
+    data_dir: Path,
+    instrument: str,
+    selection_table: SelectionTable,
+) -> int:
     instrument_dir = data_dir / instrument
     timeframes = discover_timeframes(instrument_dir)
     if not timeframes:
@@ -46,8 +58,22 @@ def show_selected_instrument_details(data_dir: Path, instrument: str) -> int:
     for timeframe in timeframes:
         print(timeframe)
 
-    for date in discover_dates(instrument_dir):
+    dates = discover_dates(instrument_dir)
+    for date in dates:
         print(date)
+
+    try:
+        selected_date = input().strip()
+    except (EOFError, OSError, StopIteration):
+        return 0
+
+    if not selected_date:
+        return 0
+
+    date_result = select_date(instrument, selected_date, dates)
+    if date_result.selection is not None:
+        selection_table.store(date_result.selection["instrument"], date_result.selection["date"])
+    print(date_result.message)
 
     return 0
 

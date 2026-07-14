@@ -6,11 +6,21 @@ from sim_server.timeframe_dates import (
 )
 
 
+def create_timeframe_dir(instrument_dir, timeframe):
+    (instrument_dir / timeframe).mkdir(parents=True, exist_ok=True)
+
+
+def write_instrument_file(instrument_dir, relative_path, content="rows are ignored"):
+    path = instrument_dir / relative_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def test_discovers_direct_timeframe_directories(tmp_path):
     instrument_dir = tmp_path / "DANE" / "MESM6"
-    (instrument_dir / "tick").mkdir(parents=True)
-    (instrument_dir / "1s").mkdir()
-    (instrument_dir / "README.txt").write_text("notes", encoding="utf-8")
+    create_timeframe_dir(instrument_dir, "tick")
+    create_timeframe_dir(instrument_dir, "1s")
+    write_instrument_file(instrument_dir, "README.txt", "notes")
 
     assert discover_timeframes(instrument_dir) == ["1s", "tick"]
 
@@ -20,6 +30,10 @@ def test_discovers_no_timeframes_for_empty_instrument_directory(tmp_path):
     instrument_dir.mkdir(parents=True)
 
     assert discover_timeframes(instrument_dir) == []
+
+
+def test_discovers_no_timeframes_when_instrument_directory_is_missing(tmp_path):
+    assert discover_timeframes(tmp_path / "DANE" / "MESM6") == []
 
 
 def test_normalizes_dates_from_supported_filename_tokens():
@@ -33,31 +47,28 @@ def test_ignores_filenames_without_date_tokens():
 
 def test_discovers_sorted_unique_dates_under_selected_instrument(tmp_path):
     instrument_dir = tmp_path / "DANE" / "MESM6"
-    tick = instrument_dir / "tick"
-    one_second = instrument_dir / "1s"
-    tick.mkdir(parents=True)
-    one_second.mkdir()
-    (tick / "glbx-mdp3-20260501.trades.csv").write_text("rows are ignored", encoding="utf-8")
-    (one_second / "glbx-mdp3-2026-05-03.ohlc.csv").write_text("rows are ignored", encoding="utf-8")
-    (tick / "duplicate-20260501.csv").write_text("rows are ignored", encoding="utf-8")
-    (tick / "notes.csv").write_text("not a date", encoding="utf-8")
+    create_timeframe_dir(instrument_dir, "tick")
+    create_timeframe_dir(instrument_dir, "1s")
+    write_instrument_file(instrument_dir, "tick/glbx-mdp3-20260501.trades.csv")
+    write_instrument_file(instrument_dir, "1s/glbx-mdp3-2026-05-03.ohlc.csv")
+    write_instrument_file(instrument_dir, "tick/duplicate-20260501.csv")
+    write_instrument_file(instrument_dir, "tick/notes.csv", "not a date")
 
     assert discover_dates(instrument_dir) == ["2026-05-01", "2026-05-03"]
 
 
+def test_discovers_no_dates_when_instrument_directory_is_missing(tmp_path):
+    assert discover_dates(tmp_path / "DANE" / "MESM6") == []
+
+
 def test_main_prints_timeframes_and_dates_after_instrument_selection(tmp_path, monkeypatch, capsys):
     dane = tmp_path / "DANE"
-    (dane / "MESM6" / "tick").mkdir(parents=True)
-    (dane / "MESM6" / "1s").mkdir()
-    (dane / "NQMM6" / "5s").mkdir(parents=True)
-    (dane / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv").write_text(
-        "csv row content",
-        encoding="utf-8",
-    )
-    (dane / "MESM6" / "1s" / "glbx-mdp3-2026-05-03.ohlc.csv").write_text(
-        "csv row content",
-        encoding="utf-8",
-    )
+    mesm = dane / "MESM6"
+    create_timeframe_dir(mesm, "tick")
+    create_timeframe_dir(mesm, "1s")
+    create_timeframe_dir(dane / "NQMM6", "5s")
+    write_instrument_file(mesm, "tick/glbx-mdp3-20260501.trades.csv", "csv row content")
+    write_instrument_file(mesm, "1s/glbx-mdp3-2026-05-03.ohlc.csv", "csv row content")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("builtins.input", lambda: "MESM6")
 
@@ -71,6 +82,18 @@ def test_main_prints_timeframes_and_dates_after_instrument_selection(tmp_path, m
     assert "2026-05-01" in output
     assert "2026-05-03" in output
     assert "csv row content" not in output
+
+
+def test_main_stops_after_blank_instrument_selection(tmp_path, monkeypatch, capsys):
+    create_timeframe_dir(tmp_path / "DANE" / "MESM6", "tick")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("builtins.input", lambda: " ")
+
+    assert main([]) == 0
+
+    output = capsys.readouterr().out
+    assert "MESM6" in output
+    assert "tick" not in output
 
 
 def test_main_reports_no_timeframes_for_empty_selected_instrument(tmp_path, monkeypatch, capsys):

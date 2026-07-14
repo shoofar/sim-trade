@@ -6,6 +6,8 @@ from sim_server.csv_load_confirmation import (
     CsvLoadError,
     find_csv_for_selection,
     load_confirmation_records,
+    model_record_from_csv_row,
+    require_fields,
     source_for_timeframe,
 )
 
@@ -31,8 +33,17 @@ def valid_rows(count: int) -> list[list[str]]:
     ]
 
 
+def provide_console_inputs(monkeypatch, *values):
+    selections = iter(values)
+    monkeypatch.setattr("builtins.input", lambda: next(selections))
+
+
+def csv_path_for(root: Path, timeframe: str = "tick") -> Path:
+    return root / "DANE" / "MESM6" / timeframe / "glbx-mdp3-20260501.trades.csv"
+
+
 def test_loads_at_most_three_required_field_records(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(4))
 
     records = load_confirmation_records(csv_path, timeframe="tick")
@@ -44,14 +55,14 @@ def test_loads_at_most_three_required_field_records(tmp_path):
 
 
 def test_loads_all_records_when_csv_has_fewer_than_three(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(2))
 
     assert len(load_confirmation_records(csv_path, timeframe="tick")) == 2
 
 
 def test_rejects_csv_missing_required_column(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     header = [field for field in REQUIRED_FIELDS if field != "sequence"]
     write_csv(csv_path, header, [row[:-2] + row[-1:] for row in valid_rows(1)])
 
@@ -64,7 +75,7 @@ def test_rejects_csv_missing_required_column(tmp_path):
 
 
 def test_hides_non_required_csv_columns_from_model_fields(tmp_path):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     header = [*REQUIRED_FIELDS, "publisher_id", "flags", "ts_recv"]
     row = [*valid_rows(1)[0], "1", "130", "2026-05-01T00:00:00Z"]
     write_csv(csv_path, header, [row])
@@ -81,6 +92,19 @@ def test_assigns_source_by_selected_timeframe():
     assert source_for_timeframe("1s") == "OHLC"
 
 
+def test_required_fields_accepts_complete_header():
+    assert require_fields(REQUIRED_FIELDS) is None
+
+
+def test_model_record_from_csv_row_adds_timeframe_and_source():
+    row = dict(zip(REQUIRED_FIELDS, valid_rows(1)[0]))
+
+    record = model_record_from_csv_row(row, timeframe="1s")
+
+    assert record["timeframe"] == "1s"
+    assert record["source"] == "OHLC"
+
+
 def test_finds_matching_csv_by_selected_date_token(tmp_path):
     instrument_dir = tmp_path / "DANE" / "MESM6"
     match = instrument_dir / "tick" / "glbx-mdp3-20260501.trades.csv"
@@ -92,11 +116,10 @@ def test_finds_matching_csv_by_selected_date_token(tmp_path):
 
 
 def test_main_loads_selected_csv_confirmation(tmp_path, monkeypatch, capsys):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     write_csv(csv_path, REQUIRED_FIELDS, valid_rows(4))
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", "2026-05-01", "tick", "load"])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-01", "tick", "load")
 
     assert main([]) == 0
 
@@ -108,12 +131,11 @@ def test_main_loads_selected_csv_confirmation(tmp_path, monkeypatch, capsys):
 
 
 def test_main_reports_missing_required_column_without_partial_records(tmp_path, monkeypatch, capsys):
-    csv_path = tmp_path / "DANE" / "MESM6" / "tick" / "glbx-mdp3-20260501.trades.csv"
+    csv_path = csv_path_for(tmp_path)
     header = [field for field in REQUIRED_FIELDS if field != "sequence"]
     write_csv(csv_path, header, [row[:-2] + row[-1:] for row in valid_rows(1)])
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", "2026-05-01", "tick", "load"])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-01", "tick", "load")
 
     assert main([]) == 0
 
@@ -121,3 +143,28 @@ def test_main_reports_missing_required_column_without_partial_records(tmp_path, 
     assert "Missing required column sequence" in output
     assert "ts_event=" not in output
     assert "Traceback" not in output
+
+
+def test_main_reports_missing_csv_for_selected_timeframe(tmp_path, monkeypatch, capsys):
+    csv_path = csv_path_for(tmp_path, timeframe="1s")
+    write_csv(csv_path, REQUIRED_FIELDS, valid_rows(1))
+    monkeypatch.chdir(tmp_path)
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-01", "tick", "load")
+
+    assert main([]) == 0
+
+    output = capsys.readouterr().out
+    assert "No CSV file available for MESM6 2026-05-01 tick" in output
+    assert "CSV loaded" not in output
+
+
+def test_main_stops_when_load_command_is_not_requested(tmp_path, monkeypatch, capsys):
+    csv_path = csv_path_for(tmp_path)
+    write_csv(csv_path, REQUIRED_FIELDS, valid_rows(1))
+    monkeypatch.chdir(tmp_path)
+    provide_console_inputs(monkeypatch, "MESM6", "2026-05-01", "tick", "")
+
+    assert main([]) == 0
+
+    output = capsys.readouterr().out
+    assert "CSV loaded" not in output

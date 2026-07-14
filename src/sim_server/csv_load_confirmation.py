@@ -39,21 +39,28 @@ def find_csv_for_selection(instrument_dir: Path, timeframe: str, date: str) -> P
 def load_confirmation_records(csv_path: Path, timeframe: str) -> list[dict[str, str]]:
     with csv_path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
-        fieldnames = reader.fieldnames or []
-        for field in REQUIRED_FIELDS:
-            if field not in fieldnames:
-                raise CsvLoadError(f"Missing required column {field}")
+        require_fields(reader.fieldnames or [])
 
         records = []
         for row in reader:
-            record = {field: row[field] for field in REQUIRED_FIELDS}
-            record["timeframe"] = timeframe
-            record["source"] = source_for_timeframe(timeframe)
-            records.append(record)
+            records.append(model_record_from_csv_row(row, timeframe))
             if len(records) == 3:
                 break
 
     return records
+
+
+def require_fields(fieldnames: list[str]) -> None:
+    for field in REQUIRED_FIELDS:
+        if field not in fieldnames:
+            raise CsvLoadError(f"Missing required column {field}")
+
+
+def model_record_from_csv_row(row: dict[str, str], timeframe: str) -> dict[str, str]:
+    record = {field: row[field] for field in REQUIRED_FIELDS}
+    record["timeframe"] = timeframe
+    record["source"] = source_for_timeframe(timeframe)
+    return record
 
 
 def source_for_timeframe(timeframe: str) -> str:

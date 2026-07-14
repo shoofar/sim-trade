@@ -1,10 +1,10 @@
 from sim_server.cli import main
+from sim_server.instrument_description_config import load_initial_descriptions
 from sim_server.instrument_descriptions import (
     DEFAULT_DESCRIPTION_FIELD,
     InstrumentDescription,
     description_field_or_default,
     description_for,
-    load_initial_descriptions,
 )
 
 

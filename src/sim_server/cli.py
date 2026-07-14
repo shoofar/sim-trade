@@ -3,7 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Sequence
 
-from sim_server.instrument_descriptions import description_for, load_initial_descriptions
+from sim_server.instrument_description_config import load_initial_descriptions
+from sim_server.instrument_descriptions import description_for
 from sim_server.instruments import instrument_names
 from sim_server.selection_memory import SelectionTable, select_date, select_instrument
 from sim_server.timeframe_dates import discover_dates, discover_timeframes

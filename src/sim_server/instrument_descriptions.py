@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from pathlib import Path
 
 
 DEFAULT_DESCRIPTION_FIELD = "pusty - do uzupelnienia"
@@ -22,8 +20,6 @@ DEFAULT_INITIAL_DESCRIPTIONS = {
         description="Micro E-mini S&P 500",
     )
 }
-
-CONFIG_FILE = "instrument_descriptions.json"
 
 
 def description_for(
@@ -47,20 +43,3 @@ def description_for(
 
 def description_field_or_default(value: str) -> str:
     return value or DEFAULT_DESCRIPTION_FIELD
-
-
-def load_initial_descriptions(root: Path) -> dict[str, InstrumentDescription]:
-    config_path = root / CONFIG_FILE
-    if not config_path.is_file():
-        return DEFAULT_INITIAL_DESCRIPTIONS
-
-    payload = json.loads(config_path.read_text(encoding="utf-8"))
-    return {
-        instrument: InstrumentDescription(
-            instrument=instrument,
-            kind=str(values.get("kind", "")),
-            description=str(values.get("description", "")),
-        )
-        for instrument, values in payload.items()
-        if isinstance(values, dict)
-    }

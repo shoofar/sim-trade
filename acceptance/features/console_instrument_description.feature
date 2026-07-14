@@ -1,3 +1,8 @@
+# mutation-stamp: sha256=abd1955483ebf17a377d6aeb9543c2c4d77bd2aaff48766e42e5206f21fa8183
+# acceptance-mutation-manifest-begin
+# {"version":1,"tested_at":"2026-07-14T20:39:39Z","feature_name":"Console instrument description","feature_path":"acceptance\\features\\console_instrument_description.feature","background_hash":"658e594fc65b379e212f89b69fa80eeb1a27aa7f416dc26f80d2ef286a6cee33","implementation_hash":"unknown","scenarios":[]}
+# acceptance-mutation-manifest-end
+
 # Console instrument description 001
 Feature: Console instrument description
   The console application shows initial descriptive information for the selected instrument.

@@ -35,6 +35,18 @@ REJECTS_UNDISCOVERED_INSTRUMENT = (
 KEEPS_SELECTION_IN_SESSION = (
     "Console selection memory 004 keeps selections only for the current run"
 )
+SHOWS_CONFIGURED_INSTRUMENT_DETAILS = (
+    "Console instrument description 001 shows configured instrument details"
+)
+SHOWS_DEFAULT_DESCRIPTION_TEXT = (
+    "Console instrument description 002 shows the default description when text is missing"
+)
+SHOWS_DEFAULT_FIELDS_FOR_MISSING_DETAILS = (
+    "Console instrument description 003 uses default fields for a discovered instrument without configured details"
+)
+DOES_NOT_ALLOW_DESCRIPTION_EDITING = (
+    "Console instrument description 004 does not allow editing descriptions in this slice"
+)
 
 
 def run_scenario(name: str) -> None:
@@ -181,6 +193,59 @@ def run_scenario(name: str) -> None:
         )
         return
 
+    if name == SHOWS_CONFIGURED_INSTRUMENT_DETAILS:
+        output = _run_console_with_selection(
+            selected="MESM6",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["MESM6", "Futures", "Micro E-mini S&P 500"],
+            excludes=["csv row content"],
+        )
+        return
+
+    if name == SHOWS_DEFAULT_DESCRIPTION_TEXT:
+        output = _run_console_with_description_config(
+            selected="MESM6",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+            config='{"MESM6": {"kind": "Futures", "description": ""}}',
+        )
+        _assert_console_output(
+            output,
+            contains=["MESM6", "Futures", "pusty - do uzupelnienia"],
+            excludes=[],
+        )
+        return
+
+    if name == SHOWS_DEFAULT_FIELDS_FOR_MISSING_DETAILS:
+        output = _run_console_with_selection(
+            selected="NQMM6",
+            directories=["NQMM6/tick"],
+            files=["NQMM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["NQMM6", "pusty - do uzupelnienia"],
+            excludes=["Traceback"],
+        )
+        return
+
+    if name == DOES_NOT_ALLOW_DESCRIPTION_EDITING:
+        output = _run_console_with_selection(
+            selected="MESM6",
+            directories=["MESM6/tick"],
+            files=["MESM6/tick/glbx-mdp3-20260501.trades.csv"],
+        )
+        _assert_console_output(
+            output,
+            contains=["MESM6", "Futures", "Micro E-mini S&P 500"],
+            excludes=["edit", "save description"],
+        )
+        return
+
     raise AssertionError(f"Unhandled acceptance scenario: {name}")
 
 
@@ -203,6 +268,25 @@ def _run_console_without_dane() -> str:
 def _run_console_with_selection(selected: str, directories: list[str], files: list[str]) -> str:
     with TemporaryDirectory() as temp:
         root = Path(temp)
+        dane = root / "DANE"
+        for directory in directories:
+            (dane / directory).mkdir(parents=True, exist_ok=True)
+        for file_name in files:
+            path = dane / file_name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("csv row content", encoding="utf-8")
+        return _run_console(root, stdin=f"{selected}\n")
+
+
+def _run_console_with_description_config(
+    selected: str,
+    directories: list[str],
+    files: list[str],
+    config: str,
+) -> str:
+    with TemporaryDirectory() as temp:
+        root = Path(temp)
+        (root / "instrument_descriptions.json").write_text(config, encoding="utf-8")
         dane = root / "DANE"
         for directory in directories:
             (dane / directory).mkdir(parents=True, exist_ok=True)

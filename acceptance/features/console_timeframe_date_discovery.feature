@@ -1,3 +1,8 @@
+# mutation-stamp: sha256=6de5ccc851095ef15cc203a92ab03431a36ae983eb827f0687313fb5f88f6706
+# acceptance-mutation-manifest-begin
+# {"version":1,"tested_at":"2026-07-14T19:32:37Z","feature_name":"Console timeframe date discovery","feature_path":"acceptance\\features\\console_timeframe_date_discovery.feature","background_hash":"f3e98878efff11a6032b82f277d9ab490b97d2361b48a02195d96c0c57ae10ca","implementation_hash":"unknown","scenarios":[]}
+# acceptance-mutation-manifest-end
+
 # Console timeframe date discovery 001
 Feature: Console timeframe date discovery
   The console application reports timeframes and file dates for a selected local instrument.

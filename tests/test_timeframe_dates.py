@@ -1,8 +1,10 @@
 from sim_server.cli import main
 from sim_server.timeframe_dates import (
+    dates_from_filenames,
     discover_dates,
     discover_timeframes,
     normalize_date_from_filename,
+    timeframe_names,
 )
 
 
@@ -23,6 +25,16 @@ def test_discovers_direct_timeframe_directories(tmp_path):
     write_instrument_file(instrument_dir, "README.txt", "notes")
 
     assert discover_timeframes(instrument_dir) == ["1s", "tick"]
+
+
+def test_timeframe_names_selects_sorted_directory_names():
+    entries = [
+        ("README.txt", False),
+        ("tick", True),
+        ("1s", True),
+    ]
+
+    assert timeframe_names(entries) == ["1s", "tick"]
 
 
 def test_discovers_no_timeframes_for_empty_instrument_directory(tmp_path):
@@ -55,6 +67,17 @@ def test_discovers_sorted_unique_dates_under_selected_instrument(tmp_path):
     write_instrument_file(instrument_dir, "tick/notes.csv", "not a date")
 
     assert discover_dates(instrument_dir) == ["2026-05-01", "2026-05-03"]
+
+
+def test_dates_from_filenames_returns_sorted_unique_supported_dates():
+    filenames = [
+        "glbx-mdp3-20260501.trades.csv",
+        "glbx-mdp3-2026-05-03.ohlc.csv",
+        "duplicate-20260501.csv",
+        "notes.csv",
+    ]
+
+    assert dates_from_filenames(filenames) == ["2026-05-01", "2026-05-03"]
 
 
 def test_discovers_no_dates_when_instrument_directory_is_missing(tmp_path):

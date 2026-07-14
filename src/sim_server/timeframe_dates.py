@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 
@@ -12,18 +13,25 @@ def discover_timeframes(instrument_dir: Path) -> list[str]:
     if not instrument_dir.is_dir():
         return []
 
-    return sorted(path.name for path in instrument_dir.iterdir() if path.is_dir())
+    return timeframe_names((path.name, path.is_dir()) for path in instrument_dir.iterdir())
 
 
 def discover_dates(instrument_dir: Path) -> list[str]:
     if not instrument_dir.is_dir():
         return []
 
+    return dates_from_filenames(path.name for path in instrument_dir.rglob("*") if path.is_file())
+
+
+def timeframe_names(entries: Iterable[tuple[str, bool]]) -> list[str]:
+    return sorted(name for name, is_directory in entries if is_directory)
+
+
+def dates_from_filenames(filenames: Iterable[str]) -> list[str]:
     dates = {
         date
-        for path in instrument_dir.rglob("*")
-        if path.is_file()
-        for date in [normalize_date_from_filename(path.name)]
+        for filename in filenames
+        for date in [normalize_date_from_filename(filename)]
         if date is not None
     }
     return sorted(dates)

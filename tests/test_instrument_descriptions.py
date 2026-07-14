@@ -2,6 +2,7 @@ from sim_server.cli import main
 from sim_server.instrument_descriptions import (
     DEFAULT_DESCRIPTION_FIELD,
     InstrumentDescription,
+    description_field_or_default,
     description_for,
     load_initial_descriptions,
 )
@@ -11,6 +12,15 @@ def write_instrument_file(data_dir, instrument, relative_path, content="rows are
     path = data_dir / instrument / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def provide_console_inputs(monkeypatch, *values):
+    selections = iter(values)
+    monkeypatch.setattr("builtins.input", lambda: next(selections))
+
+
+def write_description_config(root, payload):
+    (root / "instrument_descriptions.json").write_text(payload, encoding="utf-8")
 
 
 def test_returns_configured_instrument_description_fields():
@@ -45,6 +55,11 @@ def test_uses_default_description_text_when_configured_text_is_missing():
     )
 
 
+def test_description_field_uses_default_for_empty_text():
+    assert description_field_or_default("") == DEFAULT_DESCRIPTION_FIELD
+    assert description_field_or_default("Futures") == "Futures"
+
+
 def test_uses_default_kind_and_description_for_missing_configured_details():
     assert description_for("NQMM6", {}) == InstrumentDescription(
         instrument="NQMM6",
@@ -54,9 +69,9 @@ def test_uses_default_kind_and_description_for_missing_configured_details():
 
 
 def test_loads_initial_descriptions_from_project_config(tmp_path):
-    (tmp_path / "instrument_descriptions.json").write_text(
+    write_description_config(
+        tmp_path,
         '{"MESM6": {"kind": "Futures", "description": ""}}',
-        encoding="utf-8",
     )
 
     assert load_initial_descriptions(tmp_path) == {
@@ -72,8 +87,7 @@ def test_main_prints_description_after_instrument_selection(tmp_path, monkeypatc
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv", "csv row content")
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", ""])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "")
 
     assert main([]) == 0
 
@@ -92,8 +106,7 @@ def test_main_prints_default_description_for_missing_configured_details(
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "NQMM6", "tick/glbx-mdp3-20260501.trades.csv")
     monkeypatch.chdir(tmp_path)
-    selections = iter(["NQMM6", ""])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "NQMM6", "")
 
     assert main([]) == 0
 
@@ -110,13 +123,12 @@ def test_main_prints_default_description_when_configured_text_is_missing(
 ):
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv")
-    (tmp_path / "instrument_descriptions.json").write_text(
+    write_description_config(
+        tmp_path,
         '{"MESM6": {"kind": "Futures", "description": ""}}',
-        encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", ""])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "")
 
     assert main([]) == 0
 
@@ -130,8 +142,7 @@ def test_main_does_not_offer_description_editing_workflow(tmp_path, monkeypatch,
     data_dir = tmp_path / "DANE"
     write_instrument_file(data_dir, "MESM6", "tick/glbx-mdp3-20260501.trades.csv")
     monkeypatch.chdir(tmp_path)
-    selections = iter(["MESM6", ""])
-    monkeypatch.setattr("builtins.input", lambda: next(selections))
+    provide_console_inputs(monkeypatch, "MESM6", "")
 
     assert main([]) == 0
 

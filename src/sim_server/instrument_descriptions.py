@@ -40,9 +40,13 @@ def description_for(
 
     return InstrumentDescription(
         instrument=instrument,
-        kind=configured.kind or DEFAULT_DESCRIPTION_FIELD,
-        description=configured.description or DEFAULT_DESCRIPTION_FIELD,
+        kind=description_field_or_default(configured.kind),
+        description=description_field_or_default(configured.description),
     )
+
+
+def description_field_or_default(value: str) -> str:
+    return value or DEFAULT_DESCRIPTION_FIELD
 
 
 def load_initial_descriptions(root: Path) -> dict[str, InstrumentDescription]:

@@ -52,9 +52,7 @@ def show_selected_instrument_details(
 ) -> int:
     instrument_dir = data_dir / instrument
     description = description_for(instrument, load_initial_descriptions(data_dir.parent))
-    print(description.instrument)
-    print(description.kind)
-    print(description.description)
+    print_instrument_description(description)
 
     timeframes = discover_timeframes(instrument_dir)
     if not timeframes:
@@ -82,6 +80,12 @@ def show_selected_instrument_details(
     print(date_result.message)
 
     return 0
+
+
+def print_instrument_description(description) -> None:
+    print(description.instrument)
+    print(description.kind)
+    print(description.description)
 
 
 if __name__ == "__main__":

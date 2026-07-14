@@ -18,6 +18,10 @@ def test_discovers_direct_instrument_directories(tmp_path):
     assert discover_instruments(data_dir) == ["MESM6", "NQMM6"]
 
 
+def test_discovers_no_instruments_when_dane_is_missing(tmp_path):
+    assert discover_instruments(tmp_path / "DANE") == []
+
+
 def test_instrument_names_selects_sorted_directory_names():
     entries = [
         ("README.txt", False),

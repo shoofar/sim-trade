@@ -10,6 +10,7 @@ SelectionRow = dict[str, str]
 class SelectionResult:
     accepted: bool
     message: str
+    selection: SelectionRow | None = None
 
 
 @dataclass
@@ -36,10 +37,9 @@ def select_date(
     instrument: str,
     selected_date: str,
     available_dates: list[str],
-    selection_table: SelectionTable,
 ) -> SelectionResult:
     if selected_date not in available_dates:
         return SelectionResult(False, f"Date {selected_date} is not available for {instrument}")
 
-    selection_table.store(instrument, selected_date)
-    return SelectionResult(True, f"Stored selection {instrument} {selected_date}")
+    row = {"instrument": instrument, "date": selected_date}
+    return SelectionResult(True, f"Stored selection {instrument} {selected_date}", row)

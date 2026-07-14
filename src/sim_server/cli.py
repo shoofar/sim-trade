@@ -70,7 +70,9 @@ def show_selected_instrument_details(
     if not selected_date:
         return 0
 
-    date_result = select_date(instrument, selected_date, dates, selection_table)
+    date_result = select_date(instrument, selected_date, dates)
+    if date_result.selection is not None:
+        selection_table.store(date_result.selection["instrument"], date_result.selection["date"])
     print(date_result.message)
 
     return 0

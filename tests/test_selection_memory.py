@@ -33,23 +33,19 @@ def test_rejects_undiscovered_instrument_without_storing_selection():
 
 
 def test_rejects_undiscovered_date_without_storing_selection():
-    table = SelectionTable()
-
-    result = select_date("MESM6", "2026-05-02", ["2026-05-01"], table)
+    result = select_date("MESM6", "2026-05-02", ["2026-05-01"])
 
     assert not result.accepted
     assert result.message == "Date 2026-05-02 is not available for MESM6"
-    assert table.rows == []
+    assert result.selection is None
 
 
-def test_accepts_discovered_date_and_stores_selection():
-    table = SelectionTable()
-
-    result = select_date("MESM6", "2026-05-01", ["2026-05-01"], table)
+def test_accepts_discovered_date_and_returns_selection_row():
+    result = select_date("MESM6", "2026-05-01", ["2026-05-01"])
 
     assert result.accepted
     assert result.message == "Stored selection MESM6 2026-05-01"
-    assert table.rows == [{"instrument": "MESM6", "date": "2026-05-01"}]
+    assert result.selection == {"instrument": "MESM6", "date": "2026-05-01"}
 
 
 def test_selection_table_is_in_memory_only(tmp_path):

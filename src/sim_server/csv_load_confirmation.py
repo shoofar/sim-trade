@@ -4,7 +4,6 @@ import csv
 from pathlib import Path
 
 from sim_server.csv_confirmation_records import (
-    CsvLoadError,
     model_record_from_csv_row,
     require_fields,
 )

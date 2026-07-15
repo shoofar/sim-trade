@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
+CONSOLE_RUN_TIMEOUT_SECONDS = 10
 
 LISTS_DIRECT_INSTRUMENTS = "Console instrument discovery 001 lists direct instrument directories"
 IGNORES_NON_DIRECTORY_ENTRIES = "Console instrument discovery 002 ignores non-directory entries"
@@ -513,15 +514,25 @@ def _csv_rows(count: int) -> list[list[str]]:
 def _run_console(cwd: Path, stdin: str = "") -> str:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(SRC)
-    completed = subprocess.run(
-        [sys.executable, "-m", "sim_server"],
-        cwd=cwd,
-        env=env,
-        input=stdin,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "sim_server"],
+            cwd=cwd,
+            env=env,
+            input=stdin,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=CONSOLE_RUN_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        stdout = error.stdout or ""
+        stderr = error.stderr or ""
+        raise AssertionError(
+            "Console scenario did not terminate within "
+            f"{CONSOLE_RUN_TIMEOUT_SECONDS} seconds.\n"
+            f"stdin:\n{stdin}\nstdout:\n{stdout}\nstderr:\n{stderr}"
+        ) from error
     combined = completed.stdout + completed.stderr
     assert completed.returncode == 0, combined
     return combined

@@ -67,16 +67,29 @@ for %%P in (crap4python mutate4python) do (
 )
 
 set "NPM_CMD="
-set "NODE_BIN="
+set "NODE_EXE="
+set "LOCAL_NODE_BIN=%NODE_TOOLS%\node_modules\.bin"
 for /f "delims=" %%N in ('where npm 2^>nul') do if not defined NPM_CMD set "NPM_CMD=%%N"
 if not defined NPM_CMD if exist "%ProgramFiles%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles%\nodejs\npm.cmd"
 if not defined NPM_CMD if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles(x86)%\nodejs\npm.cmd"
-if defined NPM_CMD for %%I in ("%NPM_CMD%") do set "NODE_BIN=%%~dpI"
+for /f "delims=" %%N in ('where node 2^>nul') do if not defined NODE_EXE set "NODE_EXE=%%N"
+if not defined NODE_EXE if exist "%ProgramFiles%\nodejs\node.exe" set "NODE_EXE=%ProgramFiles%\nodejs\node.exe"
+if not defined NODE_EXE if exist "%ProgramFiles(x86)%\nodejs\node.exe" set "NODE_EXE=%ProgramFiles(x86)%\nodejs\node.exe"
 if defined NPM_CMD (
   call "%NPM_CMD%" install --prefix "%NODE_TOOLS%" jscpd
   if errorlevel 1 (
     echo ERROR: Could not install project-local jscpd with npm.
     exit /b 1
+  )
+  if defined NODE_EXE (
+    if not exist "%LOCAL_NODE_BIN%" mkdir "%LOCAL_NODE_BIN%"
+    copy /Y "%NODE_EXE%" "%LOCAL_NODE_BIN%\node.exe" >nul
+    if errorlevel 1 (
+      echo ERROR: Could not copy node.exe into the project-local jscpd bin directory.
+      exit /b 1
+    )
+  ) else (
+    echo WARNING: node.exe was not found. jscpd may require global Node.js at runtime.
   )
 ) else (
   echo WARNING: npm was not found. Project-local jscpd was not installed.
@@ -88,20 +101,20 @@ if defined NPM_CMD (
   echo set "PROJECT_ROOT=%PROJECT_ROOT%"
   echo set "TOOLS_VENV=%TOOLS_VENV%"
   echo set "NODE_TOOLS=%NODE_TOOLS%"
-  if defined NODE_BIN echo set "NODE_BIN=%NODE_BIN%"
+  if exist "%LOCAL_NODE_BIN%\node.exe" echo set "NODE_BIN=%LOCAL_NODE_BIN%"
   if exist "%LOCAL_GO%\bin\go.exe" echo set "GOROOT=%LOCAL_GO%"
   if exist "%PROJECT_ROOT%\.swarmforge\hardening\gopath" echo set "GOPATH=%PROJECT_ROOT%\.swarmforge\hardening\gopath"
   if exist "%PROJECT_ROOT%\.swarmforge\hardening\gocache" echo set "GOCACHE=%PROJECT_ROOT%\.swarmforge\hardening\gocache"
   if exist "%PROJECT_ROOT%\.swarmforge\hardening\gomodcache" echo set "GOMODCACHE=%PROJECT_ROOT%\.swarmforge\hardening\gomodcache"
   if exist "%LOCAL_GO%\bin\go.exe" (
-    if defined NODE_BIN (
-      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%NODE_BIN%;%LOCAL_GO%\bin;%%PATH%%"
+    if exist "%LOCAL_NODE_BIN%\node.exe" (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%LOCAL_NODE_BIN%;%LOCAL_GO%\bin;%%PATH%%"
     ) else (
       echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%LOCAL_GO%\bin;%%PATH%%"
     )
   ) else (
-    if defined NODE_BIN (
-      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%NODE_BIN%;%%PATH%%"
+    if exist "%LOCAL_NODE_BIN%\node.exe" (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%LOCAL_NODE_BIN%;%%PATH%%"
     ) else (
       echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%%PATH%%"
     )

@@ -8,6 +8,7 @@ Use this toolchain when Hardender needs local, installable evidence during later
 - `mutate4python` from `projects\mutate4python`
 - `radon`, `ruff`, `bandit`, `mutmut`, and `pytest-timeout` installed into `.swarmforge\hardening\.venv-tools`
 - `jscpd` installed into `.swarmforge\hardening\node-tools` when Node.js/npm is available
+- `node.exe` copied next to project-local `jscpd.cmd` so duplicate detection can run without resolving Node from the global PATH
 
 ## Install
 
@@ -25,7 +26,7 @@ This creates or updates:
 .swarmforge\hardening\hardening_env.cmd
 ```
 
-The installer does not install global Python packages, does not use editable installs, and does not install Node.js. If `npm` is missing, `jscpd` is skipped with a warning; install Node.js/npm and rerun the script when duplicate-code detection is required.
+The installer does not install global Python packages, does not use editable installs, and does not install Node.js globally. If `npm` is available during installation, the installer installs project-local `jscpd` and copies the resolved `node.exe` into `.swarmforge\hardening\node-tools\node_modules\.bin` so `jscpd.cmd` uses project-local Node at runtime. If `npm` is missing, `jscpd` is skipped with a warning; install Node.js/npm and rerun the script when duplicate-code detection is required.
 
 ## Run
 
@@ -39,6 +40,7 @@ After installation, use the dedicated project-local commands:
 .swarmforge\hardening\.venv-tools\Scripts\bandit.exe -r src
 .swarmforge\hardening\.venv-tools\Scripts\mutmut.exe --help
 .swarmforge\hardening\.venv-tools\Scripts\pytest.exe --timeout=30
+.swarmforge\hardening\node-tools\node_modules\.bin\node.exe --version
 .swarmforge\hardening\node-tools\node_modules\.bin\jscpd.cmd src --reporters console
 ```
 
@@ -54,7 +56,7 @@ jscpd src --reporters console
 go version
 ```
 
-Do not require these commands to be present in the global PATH. They are valid when resolved through the project-local paths above or after calling `hardening_env.cmd`.
+Do not require these commands to be present in the global PATH. They are valid when resolved through the project-local paths above or after calling `hardening_env.cmd`. For DRY checks, `where node` and `where jscpd` after `hardening_env.cmd` should resolve under `.swarmforge\hardening\node-tools\node_modules\.bin`.
 
 On Windows, `mutmut.exe` is only an installation check. Real mutation-test runs must use WSL.
 

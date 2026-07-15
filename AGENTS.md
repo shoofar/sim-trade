@@ -42,6 +42,14 @@ Each role in the pipeline must create a plan, send it to `AntracytowyMaster` for
 - If a pending task exists, the agent moves the oldest pending message to `agent_context/roles/<role>/working/`.
 - The agent processes the task from `agent_context/roles/<role>/working/`.
 
+## Long-running interactive programs
+
+- Specifier must define deterministic test boundaries for any console, daemon, watcher, server, or other long-running interactive program.
+- Coder must implement long-running interaction so production can wait for operator input, but automated tests must terminate through an explicit command, EOF, timeout, or bounded step count.
+- Tests must not mock input with an infinite constant response, and must not run an interactive subprocess with captured output unless they send a terminating input such as `quit` or close stdin and enforce a timeout.
+- Prefer testing interaction through a bounded session/state-machine API such as `handle_input(line)` or a `max_steps` test hook; keep full subprocess E2E tests minimal, timeout-protected, and responsible for killing the process on failure.
+- Acceptance criteria for long-running behavior must verify both liveness and deterministic shutdown, so stdout capture cannot grow without bound and Codex/CLI runners cannot wait forever.
+
 ## Priority
 
 - Nested `AGENTS.md` files override this file within their subtree.

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from pathlib import Path
@@ -45,6 +47,7 @@ ROLES = [
 class TaskItem:
     title: str
     body: str
+    slice_id: str = ""
     state: str = "pending"
     sent_at: str = ""
 
@@ -55,10 +58,18 @@ class SwarmForgeTaskSender(QMainWindow):
         self.project_root = project_root
         self.state_file = project_root / ".swarmforge" / "gui_tasks.json"
         self.outbox_dir = project_root / ".swarmforge" / "gui_outbox"
+        self.gui_dir = project_root / "agent_context" / "gui"
+        self.slices_file = self.gui_dir / "slices.json"
+        self.slices_ready_file = self.gui_dir / "slices_ready.md"
+        self.completed_slices_dir = self.gui_dir / "completed_slices"
         self.outbox_dir.mkdir(parents=True, exist_ok=True)
+        self.gui_dir.mkdir(parents=True, exist_ok=True)
+        self.completed_slices_dir.mkdir(parents=True, exist_ok=True)
         self.tasks: list[TaskItem] = []
         self.role_labels: dict[str, QLabel] = {}
         self.activity_seen_after_send = False
+        self.loaded_slices_mtime = 0.0
+        self.last_slices_error = ""
 
         self.setWindowTitle(f"Swarm-Forge Task Sender - {project_root}")
         self.resize(1220, 760)
@@ -100,10 +111,16 @@ class SwarmForgeTaskSender(QMainWindow):
         main_layout.addWidget(preview_splitter, 4)
 
         buttons = QHBoxLayout()
-        split_button = QPushButton("Rozbij opis na taski")
-        split_button.clicked.connect(lambda: self._split_description())
+        split_button = QPushButton("Poproś Specifiera o podział na slice'y")
+        split_button.clicked.connect(lambda: self._request_slice_plan())
+        import_button = QPushButton("Wczytaj slices.json")
+        import_button.clicked.connect(lambda: self._load_slices_file(force=True))
         send_button = QPushButton("Wyślij kolejne zadanie do Specifiera")
         send_button.clicked.connect(lambda: self._send_next_task())
+        reset_button = QPushButton("Zresetuj zadanie")
+        reset_button.clicked.connect(lambda: self._reset_selected_task())
+        mark_done_button = QPushButton("Oznacz wybrany jako wykonany")
+        mark_done_button.clicked.connect(lambda: self._mark_selected_done())
         save_button = QPushButton("Zapisz stan")
         save_button.clicked.connect(lambda: self._save_state())
         clear_button = QPushButton("Wyczyść listę tasków")
@@ -112,7 +129,10 @@ class SwarmForgeTaskSender(QMainWindow):
         self.unattended_check.stateChanged.connect(lambda: self._save_state())
 
         buttons.addWidget(split_button)
+        buttons.addWidget(import_button)
         buttons.addWidget(send_button)
+        buttons.addWidget(reset_button)
+        buttons.addWidget(mark_done_button)
         buttons.addWidget(save_button)
         buttons.addWidget(clear_button)
         buttons.addWidget(self.unattended_check)
@@ -150,6 +170,8 @@ class SwarmForgeTaskSender(QMainWindow):
             self.description_editor.setPlainText(data.get("description", ""))
             self.unattended_check.setChecked(bool(data.get("unattended", False)))
             self.tasks = [TaskItem(**item) for item in data.get("tasks", [])]
+            if self.slices_file.exists():
+                self.loaded_slices_mtime = self.slices_file.stat().st_mtime
         except Exception as exc:
             self._log(f"Nie udało się wczytać stanu GUI: {exc}")
 
@@ -197,6 +219,122 @@ class SwarmForgeTaskSender(QMainWindow):
         if 0 <= row < len(self.tasks):
             self.tasks[row].body = self.task_preview.toPlainText()
 
+    def _slice_id(self, title: str, index: int) -> str:
+        normalized = unicodedata.normalize("NFKD", title)
+        ascii_title = normalized.encode("ascii", "ignore").decode("ascii").lower()
+        slug = re.sub(r"[^a-z0-9]+", "-", ascii_title).strip("-")
+        return slug or f"slice-{index}"
+
+    def _completion_marker_path(self, task: TaskItem, index: int) -> Path:
+        slice_id = task.slice_id or self._slice_id(task.title, index)
+        return self.completed_slices_dir / f"{slice_id}.done"
+
+    def _apply_completed_slice_markers(self) -> bool:
+        changed = False
+        for index, task in enumerate(self.tasks, start=1):
+            if task.state == "done":
+                continue
+            if self._completion_marker_path(task, index).exists():
+                task.state = "done"
+                changed = True
+        if changed:
+            self._refresh_task_list()
+            self._save_state()
+            self._log("Wczytano znaczniki zakończonych slice'ów.")
+        return changed
+
+    def _request_slice_plan(self) -> None:
+        text = self.description_editor.toPlainText().strip()
+        if not text:
+            QMessageBox.warning(self, "Brak opisu", "Wklej opis przed wysłaniem do Specifiera.")
+            return
+        task = TaskItem(
+            title="GUI: podział opisu na slice'y",
+            body=self._slice_plan_request_body(text),
+        )
+        self._send_task(task)
+        self._save_state()
+        self._log("Wysłano opis do Specifiera z prośbą o zapis agent_context/gui/slices.json.")
+
+    def _slice_plan_request_body(self, source: str) -> str:
+        return (
+            "Task\n"
+            "Podziel poniższy opis na małe, inkrementalne slice'y dla GUI operatora.\n\n"
+            "Cel:\n"
+            "Nie implementuj funkcji i nie przekazuj pracy do Coder. Przygotuj wyłącznie listę slice'ów.\n\n"
+            "Opis źródłowy:\n"
+            f"{source}\n\n"
+            "Wymagany wynik:\n"
+            "- przygotuj plan i wyślij go do AntracytowyMaster,\n"
+            "- po akceptacji AntracytowyMaster zapisz wynik do agent_context/gui/slices.json,\n"
+            "- użyj formatu JSON opisanego w sekcji GUI slice planning protocol w instrukcji Specifiera,\n"
+            "- po zapisaniu JSON utwórz agent_context/gui/slices_ready.md,\n"
+            "- nie notyfikuj Coder dla tego zadania.\n\n"
+            "Oczekiwany styl slice'ów:\n"
+            "- każdy slice ma być mały i możliwy do przejścia przez pełny pipeline,\n"
+            "- każdy slice ma zawierać pełny tekst zadania, który GUI może później wysłać do Specifiera,\n"
+            "- pierwszy slice ma być najmniejszym sensownym krokiem.\n"
+        )
+
+    def _load_slices_file(self, force: bool = False) -> None:
+        if not self.slices_file.exists():
+            if force:
+                QMessageBox.information(
+                    self,
+                    "Brak slices.json",
+                    f"Nie znaleziono: {self.slices_file}",
+                )
+            return
+        mtime = self.slices_file.stat().st_mtime
+        if not force and mtime <= self.loaded_slices_mtime:
+            return
+        try:
+            data = json.loads(self.slices_file.read_text(encoding="utf-8-sig"))
+            slices = data.get("slices", [])
+            existing_by_id = {task.slice_id: task for task in self.tasks if task.slice_id}
+            existing_by_title = {task.title: task for task in self.tasks}
+            existing_by_body = {task.body: task for task in self.tasks}
+            loaded: list[TaskItem] = []
+            for index, item in enumerate(slices, start=1):
+                title = str(item.get("title") or f"Slice {index}")
+                slice_id = str(item.get("id") or self._slice_id(title, index))
+                body = str(item.get("body") or "").strip()
+                if not body:
+                    out_of_scope_value = item.get("out_of_scope", [])
+                    if isinstance(out_of_scope_value, list):
+                        out_of_scope = "\n".join(str(value) for value in out_of_scope_value)
+                    else:
+                        out_of_scope = str(out_of_scope_value)
+                    body = self._task_body(
+                        title=title,
+                        goal=title,
+                        scope=self.description_editor.toPlainText().strip(),
+                        out_of_scope=out_of_scope,
+                    )
+                existing = existing_by_id.get(slice_id) or existing_by_title.get(title) or existing_by_body.get(body)
+                if existing:
+                    task = TaskItem(title=title, body=body, slice_id=slice_id, state=existing.state, sent_at=existing.sent_at)
+                else:
+                    task = TaskItem(title=title, body=body, slice_id=slice_id)
+                if self._completion_marker_path(task, index).exists():
+                    task.state = "done"
+                loaded.append(task)
+            if not loaded:
+                raise ValueError("slices.json nie zawiera listy slices")
+            self.tasks = loaded
+            self.loaded_slices_mtime = mtime
+            self.last_slices_error = ""
+            self._refresh_task_list()
+            self._save_state()
+            self._log(f"Wczytano {len(self.tasks)} slice'ów z {self.slices_file}.")
+        except Exception as exc:
+            error = str(exc)
+            if force or error != self.last_slices_error:
+                self._log(f"Nie udało się wczytać slices.json: {error}")
+            self.last_slices_error = error
+            if force:
+                QMessageBox.critical(self, "Błąd slices.json", str(exc))
+
     def _split_description(self) -> None:
         text = self.description_editor.toPlainText().strip()
         if not text:
@@ -205,7 +343,7 @@ class SwarmForgeTaskSender(QMainWindow):
         self.tasks = self._build_incremental_tasks(text)
         self._refresh_task_list()
         self._save_state()
-        self._log(f"Utworzono {len(self.tasks)} tasków.")
+        self._log(f"Utworzono {len(self.tasks)} tasków lokalną heurystyką.")
 
     def _build_incremental_tasks(self, source: str) -> list[TaskItem]:
         if self._looks_like_market_data_mvp(source):
@@ -317,6 +455,51 @@ class SwarmForgeTaskSender(QMainWindow):
                 return
         QMessageBox.information(self, "Brak tasków", "Nie ma tasków w stanie pending.")
 
+    def _mark_selected_done(self) -> None:
+        row = self.task_list.currentRow()
+        if not (0 <= row < len(self.tasks)):
+            QMessageBox.information(self, "Brak wyboru", "Wybierz task albo slice z listy.")
+            return
+        self.tasks[row].state = "done"
+        if not self.tasks[row].sent_at:
+            self.tasks[row].sent_at = datetime.now().isoformat(timespec="seconds")
+        title = self.tasks[row].title
+        marker = self._completion_marker_path(self.tasks[row], row + 1)
+        marker.write_text(
+            f"completed_at={datetime.now().isoformat(timespec='seconds')}\nsource=OperatorGui\n",
+            encoding="utf-8",
+        )
+        self._refresh_task_list()
+        self.task_list.setCurrentRow(row)
+        self._save_state()
+        self._log(f"Oznaczono jako wykonany: {title}; marker: {marker.name}")
+
+    def _reset_selected_task(self) -> None:
+        row = self.task_list.currentRow()
+        if not (0 <= row < len(self.tasks)):
+            QMessageBox.information(self, "Brak wyboru", "Wybierz task albo slice z listy.")
+            return
+
+        task = self.tasks[row]
+        answer = QMessageBox.question(
+            self,
+            "Reset zadania",
+            f"Ustawic '{task.title}' ponownie jako pending i wyczyscic czas wysylki?",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        marker = self._completion_marker_path(task, row + 1)
+        if marker.exists():
+            marker.unlink()
+        task.state = "pending"
+        task.sent_at = ""
+        self.activity_seen_after_send = False
+        self._refresh_task_list()
+        self.task_list.setCurrentRow(row)
+        self._save_state()
+        self._log(f"Zresetowano zadanie do pending: {task.title}")
+
     def _send_task(self, task: TaskItem) -> None:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S.%f")[:-3]
         message_path = self.outbox_dir / f"{stamp}.md"
@@ -354,9 +537,12 @@ class SwarmForgeTaskSender(QMainWindow):
         self._log(f"Wysłano do Specifiera: {task.title}")
 
     def _tick(self) -> None:
+        self._load_slices_file()
+        self._apply_completed_slice_markers()
         self._refresh_agent_status()
-        if self.unattended_check.isChecked():
-            self._maybe_send_unattended()
+        completed_sent_task = self._mark_sent_task_done_after_activity()
+        if completed_sent_task and self.unattended_check.isChecked():
+            self._send_next_task()
 
     def _refresh_agent_status(self) -> None:
         pane_map = self._read_pane_map()
@@ -408,20 +594,24 @@ class SwarmForgeTaskSender(QMainWindow):
         )
         self.role_labels[role].setText(text)
 
-    def _maybe_send_unattended(self) -> None:
+    def _mark_sent_task_done_after_activity(self) -> bool:
         has_sent = any(task.state == "sent" for task in self.tasks)
         if not has_sent:
-            return
+            return False
         if self.any_role_working or self.any_role_inbox:
             self.activity_seen_after_send = True
-            return
+            return False
         if self.activity_seen_after_send:
             for task in self.tasks:
                 if task.state == "sent":
                     task.state = "done"
                     break
             self.activity_seen_after_send = False
-            self._send_next_task()
+            self._refresh_task_list()
+            self._save_state()
+            self._log("Oznaczono wyslany slice jako wykonany po zakonczeniu pracy agentow.")
+            return True
+        return False
 
     def _clear_tasks(self) -> None:
         answer = QMessageBox.question(

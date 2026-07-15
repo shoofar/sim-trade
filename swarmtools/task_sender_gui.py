@@ -595,23 +595,32 @@ class SwarmForgeTaskSender(QMainWindow):
         self.role_labels[role].setText(text)
 
     def _mark_sent_task_done_after_activity(self) -> bool:
-        has_sent = any(task.state == "sent" for task in self.tasks)
-        if not has_sent:
+        sent_task = next((task for task in self.tasks if task.state == "sent"), None)
+        if sent_task is None:
             return False
         if self.any_role_working or self.any_role_inbox:
             self.activity_seen_after_send = True
             return False
-        if self.activity_seen_after_send:
-            for task in self.tasks:
-                if task.state == "sent":
-                    task.state = "done"
-                    break
+        if self.activity_seen_after_send and self._final_role_done_after_task_sent(sent_task):
+            sent_task.state = "done"
             self.activity_seen_after_send = False
             self._refresh_task_list()
             self._save_state()
-            self._log("Oznaczono wyslany slice jako wykonany po zakonczeniu pracy agentow.")
+            self._log("Oznaczono wyslany slice jako wykonany po zakonczeniu roli QA.")
             return True
         return False
+
+    def _final_role_done_after_task_sent(self, task: TaskItem) -> bool:
+        if not task.sent_at:
+            return False
+        try:
+            sent_at = datetime.fromisoformat(task.sent_at).timestamp()
+        except ValueError:
+            return False
+        done_dir = self.project_root / "agent_context" / "roles" / "QA" / "done"
+        if not done_dir.exists():
+            return False
+        return any(item.is_file() and item.stat().st_mtime >= sent_at for item in done_dir.iterdir())
 
     def _clear_tasks(self) -> None:
         answer = QMessageBox.question(

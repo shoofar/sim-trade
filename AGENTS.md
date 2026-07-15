@@ -41,6 +41,8 @@ Each role in the pipeline must create a plan, send it to `AntracytowyMaster` for
 - On startup, after reading role instructions and operating rules, an agent checks `agent_context/roles/<role>/inbox/` for pending tasks.
 - If a pending task exists, the agent moves the oldest pending message to `agent_context/roles/<role>/working/`.
 - The agent processes the task from `agent_context/roles/<role>/working/`.
+- If work becomes blocked, the agent must stop active execution, write a blocker report with the reason, evidence, and required unblock action, and leave the task message in `agent_context/roles/<role>/working/`.
+- Blocked tasks must not be moved to `agent_context/roles/<role>/done/`; keeping them in `working/` is required so the role can resume the same task after the blocker is removed.
 
 ## Long-running interactive programs
 
@@ -49,6 +51,7 @@ Each role in the pipeline must create a plan, send it to `AntracytowyMaster` for
 - Tests must not mock input with an infinite constant response, and must not run an interactive subprocess with captured output unless they send a terminating input such as `quit` or close stdin and enforce a timeout.
 - Prefer testing interaction through a bounded session/state-machine API such as `handle_input(line)` or a `max_steps` test hook; keep full subprocess E2E tests minimal, timeout-protected, and responsible for killing the process on failure.
 - Acceptance criteria for long-running behavior must verify both liveness and deterministic shutdown, so stdout capture cannot grow without bound and Codex/CLI runners cannot wait forever.
+- Before handoff, an agent that started test processes, subprocesses, servers, watchers, CLIs, or other child processes must stop every process it started or prove that it exited. If a launched command can orphan children, the agent must fix the invoking code/script/test to use timeouts, process cleanup, and child termination before handing off.
 
 ## Priority
 

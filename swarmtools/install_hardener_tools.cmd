@@ -4,16 +4,20 @@ setlocal EnableExtensions EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 for %%I in ("%SCRIPT_DIR%..") do set "PROJECT_ROOT=%%~fI"
 set "TOOLS_VENV=%PROJECT_ROOT%\.swarmforge\hardening\.venv-tools"
+set "NODE_TOOLS=%PROJECT_ROOT%\.swarmforge\hardening\node-tools"
+set "HARDENING_ENV=%PROJECT_ROOT%\.swarmforge\hardening\hardening_env.cmd"
+set "LOCAL_GO=%PROJECT_ROOT%\.swarmforge\hardening\go1.26.5\go"
 set "CRAP_PROJECT=%PROJECT_ROOT%\projects\crap4python"
-set "DRY_PROJECT=%PROJECT_ROOT%\projects\dry4python"
 set "MUTATE_PROJECT=%PROJECT_ROOT%\projects\mutate4python"
+if not exist "%CRAP_PROJECT%\pyproject.toml" (
+  for %%I in ("%PROJECT_ROOT%\..\crap4python") do set "CRAP_PROJECT=%%~fI"
+)
+if not exist "%MUTATE_PROJECT%\pyproject.toml" (
+  for %%I in ("%PROJECT_ROOT%\..\mutate4python") do set "MUTATE_PROJECT=%%~fI"
+)
 
 if not exist "%CRAP_PROJECT%\pyproject.toml" (
   echo ERROR: Missing project: %CRAP_PROJECT%
-  exit /b 1
-)
-if not exist "%DRY_PROJECT%\pyproject.toml" (
-  echo ERROR: Missing project: %DRY_PROJECT%
   exit /b 1
 )
 if not exist "%MUTATE_PROJECT%\pyproject.toml" (
@@ -44,13 +48,74 @@ if not exist "%TOOLS_VENV%\Scripts\python.exe" (
 )
 
 set "VENV_PY=%TOOLS_VENV%\Scripts\python.exe"
-"%VENV_PY%" -m pip install -e "%CRAP_PROJECT%" -e "%DRY_PROJECT%" -e "%MUTATE_PROJECT%"
+"%VENV_PY%" -m pip install --upgrade pip wheel
 if errorlevel 1 (
-  echo ERROR: Could not install local hardening tools.
+  echo ERROR: Could not upgrade pip and wheel in local hardening venv.
   exit /b 1
 )
 
+"%VENV_PY%" -m pip install --no-cache-dir --no-build-isolation --force-reinstall radon ruff bandit mutmut pytest-timeout "%CRAP_PROJECT%" "%MUTATE_PROJECT%"
+if errorlevel 1 (
+  echo ERROR: Could not install local hardening tools into the project venv.
+  exit /b 1
+)
+
+for %%P in (crap4python mutate4python) do (
+  for /d %%D in ("%TOOLS_VENV%\Lib\site-packages\%%P-*.dist-info") do (
+    if exist "%%~fD\direct_url.json" del /q "%%~fD\direct_url.json"
+  )
+)
+
+set "NPM_CMD="
+set "NODE_BIN="
+for /f "delims=" %%N in ('where npm 2^>nul') do if not defined NPM_CMD set "NPM_CMD=%%N"
+if not defined NPM_CMD if exist "%ProgramFiles%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles%\nodejs\npm.cmd"
+if not defined NPM_CMD if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles(x86)%\nodejs\npm.cmd"
+if defined NPM_CMD for %%I in ("%NPM_CMD%") do set "NODE_BIN=%%~dpI"
+if defined NPM_CMD (
+  call "%NPM_CMD%" install --prefix "%NODE_TOOLS%" jscpd
+  if errorlevel 1 (
+    echo ERROR: Could not install project-local jscpd with npm.
+    exit /b 1
+  )
+) else (
+  echo WARNING: npm was not found. Project-local jscpd was not installed.
+  echo WARNING: Install Node.js/npm and rerun this script if DRY duplicate detection is required.
+)
+
+(
+  echo @echo off
+  echo set "PROJECT_ROOT=%PROJECT_ROOT%"
+  echo set "TOOLS_VENV=%TOOLS_VENV%"
+  echo set "NODE_TOOLS=%NODE_TOOLS%"
+  if defined NODE_BIN echo set "NODE_BIN=%NODE_BIN%"
+  if exist "%LOCAL_GO%\bin\go.exe" echo set "GOROOT=%LOCAL_GO%"
+  if exist "%PROJECT_ROOT%\.swarmforge\hardening\gopath" echo set "GOPATH=%PROJECT_ROOT%\.swarmforge\hardening\gopath"
+  if exist "%PROJECT_ROOT%\.swarmforge\hardening\gocache" echo set "GOCACHE=%PROJECT_ROOT%\.swarmforge\hardening\gocache"
+  if exist "%PROJECT_ROOT%\.swarmforge\hardening\gomodcache" echo set "GOMODCACHE=%PROJECT_ROOT%\.swarmforge\hardening\gomodcache"
+  if exist "%LOCAL_GO%\bin\go.exe" (
+    if defined NODE_BIN (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%NODE_BIN%;%LOCAL_GO%\bin;%%PATH%%"
+    ) else (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%LOCAL_GO%\bin;%%PATH%%"
+    )
+  ) else (
+    if defined NODE_BIN (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%NODE_BIN%;%%PATH%%"
+    ) else (
+      echo set "PATH=%TOOLS_VENV%\Scripts;%NODE_TOOLS%\node_modules\.bin;%%PATH%%"
+    )
+  )
+) > "%HARDENING_ENV%"
+
 echo Installed local hardening tools into:
 echo   %TOOLS_VENV%
+echo Installed Python hardening backends into the project venv:
+echo   radon ruff bandit mutmut pytest-timeout
+if defined NPM_CMD (
+  echo Installed project-local Node.js duplicate detector into:
+  echo   %NODE_TOOLS%
+)
+echo Wrote local hardening environment:
+echo   %HARDENING_ENV%
 exit /b 0
-
